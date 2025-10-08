@@ -127,7 +127,12 @@ export default function ChatsPage() {
       await createMessage(activeChat.id, messageData.content, user.id);
 
       if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(messageData.content));
+        wsRef.current.send(
+          JSON.stringify({
+            chat_id: activeChat.id,
+            content: newMessage,
+          })
+        );
       }
     } catch (err) {
       console.error("Failed to send message:", err);
