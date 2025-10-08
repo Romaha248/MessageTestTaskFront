@@ -149,9 +149,6 @@ export default function ChatsPage() {
     setNewMessage("");
 
     try {
-      // Save via REST API
-      await createMessage(activeChat.id, messageData.content, user.id);
-
       // Send via WebSocket
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
@@ -161,6 +158,8 @@ export default function ChatsPage() {
           })
         );
       }
+      // Save via REST API
+      await createMessage(activeChat.id, messageData.content, user.id);
     } catch (err) {
       console.error("Failed to send message:", err);
     }
