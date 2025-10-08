@@ -9,4 +9,5 @@ export interface Message {
   chat_id: string;
   sender_id: string;
   content: string;
+  timestamp: string;
 }
