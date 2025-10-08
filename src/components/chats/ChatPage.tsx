@@ -10,6 +10,8 @@ import {
 } from "../../service/chat";
 import { useAuth } from "../../hooks/useAuth";
 
+const baseUrl = import.meta.env.VITE_WEBSOCKET_BASE_URL;
+
 export default function ChatsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -62,7 +64,7 @@ export default function ChatsPage() {
   useEffect(() => {
     if (!user) return;
 
-    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/${user.id}`);
+    const ws = new WebSocket(`${baseUrl}/ws/${user.id}`);
     wsRef.current = ws;
 
     ws.onmessage = (event) => {
