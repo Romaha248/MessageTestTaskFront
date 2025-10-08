@@ -101,7 +101,7 @@ export default function ChatsPage() {
     return () => {
       ws.close();
     };
-  }, [user]);
+  }, [user, activeChat]);
 
   // --- Scroll to bottom when messages update ---
   useEffect(() => {
