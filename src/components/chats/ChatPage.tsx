@@ -71,40 +71,40 @@ export default function ChatsPage() {
   useEffect(() => {
     if (!user) return;
 
-    let ws: WebSocket;
+    const ws = new WebSocket(`${baseUrl}/ws/${user.id}`);
+    wsRef.current = ws;
 
-    const connectWebSocket = () => {
-      ws = new WebSocket(`${baseUrl}/ws/${user.id}`);
-      wsRef.current = ws;
+    ws.onopen = () => console.log("✅ WebSocket connected");
 
-      ws.onopen = () => console.log("✅ WebSocket connected");
-
-      ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
+      try {
         const msg = JSON.parse(event.data);
-        console.log("WS message received:", msg);
-        if (!msg.chat_id) return;
+        console.log("📨 WS received:", msg);
 
-        setMessages((prev) =>
-          activeChat && msg.chat_id === activeChat.id ? [...prev, msg] : prev
-        );
-      };
-
-      ws.onclose = () => {
-        console.warn("⚠️ WebSocket closed, reconnecting in 3s...");
-        setTimeout(connectWebSocket, 3000);
-      };
-
-      ws.onerror = (err) => console.error("❌ WebSocket error:", err);
+        // Only add messages that belong to the currently open chat
+        if (activeChat && msg.chat_id === activeChat.id) {
+          setMessages((prev) => [...prev, msg]);
+        }
+      } catch (err) {
+        console.error("Error parsing WS message:", err);
+      }
     };
 
-    connectWebSocket();
+    ws.onclose = () => {
+      console.warn("⚠️ WebSocket closed — reconnecting in 3s...");
+      setTimeout(() => {
+        if (user) window.location.reload();
+      }, 3000);
+    };
+
+    ws.onerror = (err) => console.error("❌ WebSocket error:", err);
 
     return () => {
       ws.close();
     };
   }, [user, activeChat]);
 
-  // --- Scroll to bottom when messages update ---
+  // --- Auto scroll to bottom when messages change ---
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -121,7 +121,7 @@ export default function ChatsPage() {
       setSelectedUser("");
     } catch (err) {
       console.error("Failed to create chat:", err);
-      alert("Failed to create chat");
+      alert("Could not create chat");
     }
   };
 
@@ -137,6 +137,7 @@ export default function ChatsPage() {
       timestamp: new Date().toISOString(),
     };
 
+    // Optimistic update
     setMessages((prev) => [...prev, messageData]);
     setNewMessage("");
 
@@ -158,6 +159,13 @@ export default function ChatsPage() {
     }
   };
 
+  // --- Helper: find the other participant ---
+  const getOtherUser = (chat: Chat) => {
+    const otherUserId =
+      chat.user1_id === user?.id ? chat.user2_id : chat.user1_id;
+    return users.find((u) => u.id === otherUserId);
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
@@ -170,7 +178,7 @@ export default function ChatsPage() {
               onChange={(e) => setSelectedUser(e.target.value)}
               className="flex-1 border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-300"
             >
-              <option value="">Select a user...</option>
+              <option value="">Select user...</option>
               {users
                 .filter((u) => u.id !== user?.id)
                 .map((u) => (
@@ -196,16 +204,7 @@ export default function ChatsPage() {
         <h2 className="text-xl font-bold p-4 border-b">Chats</h2>
         <ul className="flex-1 overflow-y-auto">
           {chats.map((chat) => {
-            const otherUser =
-              users.find(
-                (u) => u.id === chat.user1_id || u.id === chat.user2_id
-              )?.id !== user?.id
-                ? users.find(
-                    (u) => u.id === chat.user1_id || u.id === chat.user2_id
-                  )
-                : users.find(
-                    (u) => u.id === chat.user1_id || u.id === chat.user2_id
-                  );
+            const otherUser = getOtherUser(chat);
             return (
               <li
                 key={chat.id}
@@ -223,54 +222,62 @@ export default function ChatsPage() {
 
       {/* Chat Window */}
       <div className="flex-1 flex flex-col">
-        <div className="flex-1 p-4 overflow-y-auto">
-          {messages.map((msg) => {
-            const isMine = msg.sender_id === user?.id;
-            return (
-              <div
-                key={msg.id}
-                className={`mb-3 flex ${
-                  isMine ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div
-                  className={`px-4 py-2 rounded-lg max-w-xs break-words ${
-                    isMine
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-800"
-                  }`}
-                >
-                  {msg.content}
-                  <div className="text-xs mt-1 opacity-70 text-right">
-                    {new Date(msg.timestamp).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+        {activeChat ? (
+          <>
+            <div className="flex-1 p-4 overflow-y-auto">
+              {messages.map((msg) => {
+                const isMine = msg.sender_id === user?.id;
+                return (
+                  <div
+                    key={msg.id}
+                    className={`mb-3 flex ${
+                      isMine ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`px-4 py-2 rounded-lg max-w-xs break-words ${
+                        isMine
+                          ? "bg-blue-500 text-white"
+                          : "bg-gray-200 text-gray-800"
+                      }`}
+                    >
+                      {msg.content}
+                      <div className="text-xs mt-1 opacity-70 text-right">
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            );
-          })}
-          <div ref={messagesEndRef} />
-        </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </div>
 
-        {/* Input Area */}
-        <div className="p-4 border-t flex">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 border rounded px-3 py-2 mr-2 focus:outline-none focus:ring focus:border-blue-300"
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          />
-          <button
-            onClick={handleSend}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-          >
-            Send
-          </button>
-        </div>
+            {/* Input Area */}
+            <div className="p-4 border-t flex">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 border rounded px-3 py-2 mr-2 focus:outline-none focus:ring focus:border-blue-300"
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              />
+              <button
+                onClick={handleSend}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+              >
+                Send
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-500">
+            Select or start a chat
+          </div>
+        )}
       </div>
     </div>
   );
