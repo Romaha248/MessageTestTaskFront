@@ -71,51 +71,37 @@ export default function ChatsPage() {
   useEffect(() => {
     if (!user) return;
 
-    const wsUrl = `${baseUrl}/ws/${user.id}`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    let ws: WebSocket;
 
-    ws.onopen = () => console.log("✅ WebSocket connected");
+    const connectWebSocket = () => {
+      ws = new WebSocket(`${baseUrl}/ws/${user.id}`);
+      wsRef.current = ws;
 
-    ws.onmessage = (event) => {
-      try {
-        const msg: Message & { chat_id: string } = JSON.parse(event.data);
+      ws.onopen = () => console.log("✅ WebSocket connected");
 
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
         if (!msg.chat_id) return;
 
-        // Only add message if it belongs to the active chat
-        setMessages((prev) => {
-          if (activeChat && msg.chat_id === activeChat.id) {
-            return [...prev, msg];
-          }
-          return prev;
-        });
+        setMessages((prev) =>
+          activeChat && msg.chat_id === activeChat.id ? [...prev, msg] : prev
+        );
+      };
 
-        // Move chat to top
-        setChats((prevChats) => {
-          const idx = prevChats.findIndex((c) => c.id === msg.chat_id);
-          if (idx > -1) {
-            const updated = [...prevChats];
-            const [chat] = updated.splice(idx, 1);
-            updated.unshift(chat);
-            return updated;
-          }
-          return prevChats;
-        });
-      } catch (err) {
-        console.error("Failed to parse WebSocket message:", err);
-      }
+      ws.onclose = () => {
+        console.warn("⚠️ WebSocket closed, reconnecting in 3s...");
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = (err) => console.error("❌ WebSocket error:", err);
     };
 
-    ws.onclose = () => {
-      console.warn("⚠️ WebSocket closed, reconnecting...");
-      setTimeout(fetchData, 3000);
+    connectWebSocket();
+
+    return () => {
+      ws.close();
     };
-
-    ws.onerror = (err) => console.error("❌ WebSocket error:", err);
-
-    return () => ws.close();
-  }, [user, activeChat, fetchData]);
+  }, [user]);
 
   // --- Scroll to bottom when messages update ---
   useEffect(() => {
