@@ -64,22 +64,25 @@ export default function ChatsPage() {
   useEffect(() => {
     if (!user) return;
 
-    const ws = new WebSocket(`${baseUrl}/ws/${user.id}`);
+    const wsUrl = `${baseUrl}/ws/${user.id}`;
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
+    ws.onopen = () => console.log("WebSocket connected");
     ws.onmessage = (event) => {
       const msg: Message = JSON.parse(event.data);
       setMessages((prev) =>
         activeChat && msg.chat_id === activeChat.id ? [...prev, msg] : prev
       );
 
+      // Move the chat to top
       setChats((prevChats) => {
         const idx = prevChats.findIndex((c) => c.id === msg.chat_id);
         if (idx > -1) {
-          const updatedChats = [...prevChats];
-          const [chat] = updatedChats.splice(idx, 1);
-          updatedChats.unshift(chat);
-          return updatedChats;
+          const updated = [...prevChats];
+          const [chat] = updated.splice(idx, 1);
+          updated.unshift(chat);
+          return updated;
         }
         return prevChats;
       });
@@ -88,8 +91,10 @@ export default function ChatsPage() {
     ws.onclose = () => console.log("WebSocket closed");
     ws.onerror = (err) => console.error("WebSocket error", err);
 
-    return () => ws.close();
-  }, [user, activeChat]);
+    return () => {
+      ws.close();
+    };
+  }, [user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
