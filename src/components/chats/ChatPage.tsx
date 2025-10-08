@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { User } from "../../interfaces/authContext";
 import type { Chat, Message } from "../../interfaces/chat";
@@ -13,6 +15,8 @@ import { useAuth } from "../../hooks/useAuth";
 const baseUrl = import.meta.env.VITE_WEBSOCKET_BASE_URL;
 
 export default function ChatsPage() {
+  const { user } = useAuth();
+
   const [users, setUsers] = useState<User[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
@@ -20,17 +24,17 @@ export default function ChatsPage() {
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [newMessage, setNewMessage] = useState<string>("");
 
-  const { user } = useAuth();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // --- Fetch users, chats, and messages ---
+  // --- Fetch users and chats ---
   const fetchData = useCallback(async () => {
     try {
       const [usersData, chatsData] = await Promise.all([
         getAllUsers(),
         getAllChats(),
       ]);
+
       setUsers(usersData);
       setChats(chatsData);
 
@@ -68,21 +72,18 @@ export default function ChatsPage() {
     if (!user) return;
 
     const wsUrl = `${baseUrl}/ws/${user.id}`;
-    console.log("Connecting WebSocket to:", wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => {
-      console.log("✅ WebSocket connected");
-    };
+    ws.onopen = () => console.log("✅ WebSocket connected");
 
     ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data);
+        const msg: Message & { chat_id: string } = JSON.parse(event.data);
 
-        // Expecting { chat_id, sender_id, content, timestamp }
         if (!msg.chat_id) return;
 
+        // Only add message if it belongs to the active chat
         setMessages((prev) => {
           if (activeChat && msg.chat_id === activeChat.id) {
             return [...prev, msg];
@@ -90,7 +91,7 @@ export default function ChatsPage() {
           return prev;
         });
 
-        // Move chat to top if message belongs to it
+        // Move chat to top
         setChats((prevChats) => {
           const idx = prevChats.findIndex((c) => c.id === msg.chat_id);
           if (idx > -1) {
@@ -106,22 +107,15 @@ export default function ChatsPage() {
       }
     };
 
-    ws.onclose = (e) => {
-      console.warn("⚠️ WebSocket closed:", e.reason);
-      setTimeout(() => {
-        console.log("🔁 Reconnecting WebSocket...");
-        fetchData();
-      }, 3000);
+    ws.onclose = () => {
+      console.warn("⚠️ WebSocket closed, reconnecting...");
+      setTimeout(fetchData, 3000);
     };
 
-    ws.onerror = (err) => {
-      console.error("❌ WebSocket error:", err);
-    };
+    ws.onerror = (err) => console.error("❌ WebSocket error:", err);
 
-    return () => {
-      ws.close();
-    };
-  }, [user]);
+    return () => ws.close();
+  }, [user, activeChat, fetchData]);
 
   // --- Scroll to bottom when messages update ---
   useEffect(() => {
@@ -130,12 +124,12 @@ export default function ChatsPage() {
 
   // --- Start new chat ---
   const handleStartChat = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || !user) return;
 
     try {
-      const chat = await createChat(selectedUser);
-      setChats((prev) => [chat, ...prev]);
-      setActiveChat(chat);
+      const newChat = await createChat(selectedUser);
+      setChats((prev) => [newChat, ...prev]);
+      setActiveChat(newChat);
       setMessages([]);
       setSelectedUser("");
     } catch (err) {
@@ -160,10 +154,10 @@ export default function ChatsPage() {
     setNewMessage("");
 
     try {
-      // Save to backend via REST
+      // Save via REST API
       await createMessage(activeChat.id, messageData.content, user.id);
 
-      // Send via WebSocket for real-time delivery
+      // Send via WebSocket
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
@@ -215,9 +209,16 @@ export default function ChatsPage() {
         <h2 className="text-xl font-bold p-4 border-b">Chats</h2>
         <ul className="flex-1 overflow-y-auto">
           {chats.map((chat) => {
-            const otherUser = users.find(
-              (u) => u.id === chat.user1_id || u.id === chat.user2_id
-            );
+            const otherUser =
+              users.find(
+                (u) => u.id === chat.user1_id || u.id === chat.user2_id
+              )?.id !== user?.id
+                ? users.find(
+                    (u) => u.id === chat.user1_id || u.id === chat.user2_id
+                  )
+                : users.find(
+                    (u) => u.id === chat.user1_id || u.id === chat.user2_id
+                  );
             return (
               <li
                 key={chat.id}
