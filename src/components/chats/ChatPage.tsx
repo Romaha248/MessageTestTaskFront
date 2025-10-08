@@ -48,6 +48,45 @@ export default function ChatsPage() {
     }
   }, []);
 
+  const connectWebSocket = useCallback(() => {
+    if (!user) return;
+
+    // Ensure correct protocol (wss instead of https)
+    const wsUrl = `${baseUrl.replace(/^http/, "ws")}/ws/${user.id}`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("✅ WebSocket connected");
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        console.log("📩 WS message:", msg);
+
+        // Only show messages for the active chat
+        if (activeChat && msg.chat_id === activeChat.id) {
+          setMessages((prev) => [...prev, msg]);
+        }
+      } catch (err) {
+        console.error("Error parsing WS message:", err);
+      }
+    };
+
+    ws.onclose = (event) => {
+      console.warn(
+        `⚠️ WebSocket closed (code ${event.code}). Reconnecting in 3s...`
+      );
+      setTimeout(() => connectWebSocket(), 3000);
+    };
+
+    ws.onerror = (err) => {
+      console.error("❌ WebSocket error:", err);
+      ws.close(); // Ensure clean close
+    };
+  }, [user, activeChat]);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -69,40 +108,8 @@ export default function ChatsPage() {
 
   // --- WebSocket setup ---
   useEffect(() => {
-    if (!user) return;
-
-    const ws = new WebSocket(`${baseUrl}/ws/${user.id}`);
-    wsRef.current = ws;
-
-    ws.onopen = () => console.log("✅ WebSocket connected");
-
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        console.log("📨 WS received:", msg);
-
-        // Only add messages that belong to the currently open chat
-        if (activeChat && msg.chat_id === activeChat.id) {
-          setMessages((prev) => [...prev, msg]);
-        }
-      } catch (err) {
-        console.error("Error parsing WS message:", err);
-      }
-    };
-
-    ws.onclose = () => {
-      console.warn("⚠️ WebSocket closed — reconnecting in 3s...");
-      setTimeout(() => {
-        if (user) window.location.reload();
-      }, 3000);
-    };
-
-    ws.onerror = (err) => console.error("❌ WebSocket error:", err);
-
-    return () => {
-      ws.close();
-    };
-  }, [user, activeChat]);
+    if (user) connectWebSocket();
+  }, [user, connectWebSocket]);
 
   // --- Auto scroll to bottom when messages change ---
   useEffect(() => {
