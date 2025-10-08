@@ -81,6 +81,7 @@ export default function ChatsPage() {
 
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
+        console.log("WS message received:", msg);
         if (!msg.chat_id) return;
 
         setMessages((prev) =>
