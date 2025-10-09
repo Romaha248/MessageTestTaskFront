@@ -178,6 +178,11 @@ export default function ChatsPage() {
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
       <div className="w-64 bg-white border-r flex flex-col">
+        <div className="p-4 border-b bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-800">
+            {user?.username || "Loading..."}
+          </h2>
+        </div>
         <div className="p-4 border-b">
           <label className="block text-sm font-medium mb-1">Start Chat</label>
           <div className="flex gap-2">
