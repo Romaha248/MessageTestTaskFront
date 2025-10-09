@@ -146,8 +146,8 @@ export default function ChatsPage() {
     };
 
     // Optimistic update
-    setMessages((prev) => [...prev, messageData]);
-    setNewMessage("");
+    // setMessages((prev) => [...prev, messageData]);
+    // setNewMessage("");
 
     try {
       // Send via WebSocket
