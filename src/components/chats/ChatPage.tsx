@@ -143,7 +143,7 @@ export default function ChatsPage() {
       chat_id: activeChat.id,
       sender_id: user.id,
       content: newMessage.trim(),
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
 
     // Optimistic update
@@ -251,7 +251,7 @@ export default function ChatsPage() {
                     >
                       {msg.content}
                       <div className="text-xs mt-1 opacity-70 text-right">
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                        {new Date(msg.created_at).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
