@@ -3,7 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 
 export default function Navbar() {
   const location = useLocation();
-  const { isLoggedIn, user, logout } = useAuth();
+  const { isLoggedIn, logout } = useAuth();
 
   const linkClass = (path: string) =>
     `px-4 py-2 rounded hover:bg-blue-100 transition ${
@@ -33,9 +33,6 @@ export default function Navbar() {
             <Link to="/chats" className={linkClass("/")}>
               Chats
             </Link>
-            <span className="px-2 py-1 text-gray-700 font-medium">
-              {user?.username}
-            </span>
             <button
               onClick={logout}
               className="px-4 py-2 rounded hover:bg-red-100 transition text-red-500"
