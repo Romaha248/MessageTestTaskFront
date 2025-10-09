@@ -64,6 +64,7 @@ export default function ChatsPage() {
       try {
         const msg = JSON.parse(event.data);
         console.log("📩 WS message:", msg);
+        console.log(messages);
 
         // Only show messages for the active chat
         if (activeChat && msg.chat_id === activeChat.id) {
