@@ -178,7 +178,7 @@ export default function ChatsPage() {
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
       <div className="w-64 bg-white border-r flex flex-col">
-        <div className="p-4 border-b bg-gray-50">
+        <div className="p-4 border-b bg-white">
           <h2 className="text-lg font-semibold text-gray-800">
             {user?.username || "Loading..."}
           </h2>
