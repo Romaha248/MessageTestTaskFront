@@ -42,6 +42,7 @@ export default function ChatsPage() {
         setActiveChat(chatsData[0]);
         const messagesData = await getAllMessages(chatsData[0].id);
         setMessages(messagesData);
+        console.log(messagesData);
       }
     } catch (err) {
       console.error("Failed to fetch data:", err);
