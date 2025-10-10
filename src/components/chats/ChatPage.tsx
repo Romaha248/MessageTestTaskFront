@@ -148,31 +148,26 @@ export default function ChatsPage() {
   const handleSend = async () => {
     if (!newMessage.trim() || !activeChat || !user?.id) return;
 
-    const messageData: Message = {
-      id: crypto.randomUUID(),
-      chat_id: activeChat.id,
-      sender_id: user.id,
-      content: newMessage.trim(),
-      created_at: new Date().toISOString(),
-    };
-
-    // Optimistic update
-    setMessages((prev) => [...prev, messageData]);
+    const content = newMessage.trim();
     setNewMessage("");
 
     try {
+      // Save via REST API first (backend returns message with real ID)
+      const savedMessage = await createMessage(activeChat.id, content, user.id);
+
+      // Add to UI
+      setMessages((prev) => [...prev, savedMessage]);
+
       // Send via WebSocket
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
             chat_id: activeChat.id,
-            content: messageData.content,
+            content: content,
             event: "message_new",
           })
         );
       }
-      // Save via REST API
-      await createMessage(activeChat.id, messageData.content, user.id);
     } catch (err) {
       console.error("Failed to send message:", err);
     }
