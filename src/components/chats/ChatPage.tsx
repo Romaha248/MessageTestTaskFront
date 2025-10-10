@@ -148,28 +148,49 @@ export default function ChatsPage() {
   const handleSend = async () => {
     if (!newMessage.trim() || !activeChat || !user?.id) return;
 
-    const content = newMessage.trim();
+    const tempId = crypto.randomUUID(); // temporary ID for optimistic UI
+    const tempMessage: Message = {
+      id: tempId,
+      chat_id: activeChat.id,
+      sender_id: user.id,
+      content: newMessage.trim(),
+      created_at: new Date().toISOString(),
+    };
+
+    // Optimistic update
+    setMessages((prev) => [...prev, tempMessage]);
     setNewMessage("");
 
     try {
-      // Save via REST API first (backend returns message with real ID)
-      const savedMessage = await createMessage(activeChat.id, content, user.id);
+      // Save via REST API and get real message with DB ID
+      const savedMessage = await createMessage(
+        activeChat.id,
+        tempMessage.content,
+        user.id
+      );
 
-      // Add to UI
-      setMessages((prev) => [...prev, savedMessage]);
+      // Replace temp message with real one
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? savedMessage : m))
+      );
 
-      // Send via WebSocket
+      // Send via WebSocket using real message
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
             chat_id: activeChat.id,
-            content: content,
+            content: savedMessage.content,
+            sender_id: savedMessage.sender_id,
+            id: savedMessage.id,
             event: "message_new",
+            created_at: savedMessage.created_at,
           })
         );
       }
     } catch (err) {
       console.error("Failed to send message:", err);
+      // Optionally remove temp message on failure
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };
 
@@ -177,7 +198,7 @@ export default function ChatsPage() {
     try {
       await deleteMessage(id);
       // Optimistic UI update
-      setMessages((prev) => prev.filter((m) => m.id !== id));
+      // setMessages((prev) => prev.filter((m) => m.id !== id));
     } catch (err) {
       console.error("Failed to delete message:", err);
       alert("Could not delete message");
