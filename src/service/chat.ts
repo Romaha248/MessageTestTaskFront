@@ -32,3 +32,8 @@ export const createMessage = async (
   });
   return response.data;
 };
+
+export const deleteMessage = async (id: string): Promise<boolean> => {
+  const response = await apiClient.delete(`/chats/delete-message/${id}`);
+  return response.data;
+};

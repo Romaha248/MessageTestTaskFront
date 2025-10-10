@@ -7,6 +7,7 @@ import { getAllUsers } from "../../service/auth";
 import {
   createChat,
   createMessage,
+  deleteMessage,
   getAllChats,
   getAllMessages,
 } from "../../service/chat";
@@ -66,9 +67,18 @@ export default function ChatsPage() {
         const msg = JSON.parse(event.data);
         console.log("📩 WS message:", msg);
 
+        if (msg.event === "message_deleted") {
+          setMessages((prev) => prev.filter((m) => m.id !== msg.message_id));
+          return;
+        }
+
         if (msg.sender_id === user?.id) return;
         // Only show messages for the active chat
-        if (activeChat && msg.chat_id === activeChat.id) {
+        if (
+          activeChat &&
+          msg.chat_id === activeChat.id &&
+          msg.event === "message_new"
+        ) {
           setMessages((prev) => [...prev, msg]);
         }
       } catch (err) {
@@ -167,6 +177,17 @@ export default function ChatsPage() {
     }
   };
 
+  const handleDeleteMessage = async (id: string) => {
+    try {
+      await deleteMessage(id);
+      // Optimistic UI update
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+    } catch (err) {
+      console.error("Failed to delete message:", err);
+      alert("Could not delete message");
+    }
+  };
+
   // --- Helper: find the other participant ---
   const getOtherUser = (chat: Chat) => {
     const otherUserId =
@@ -247,24 +268,38 @@ export default function ChatsPage() {
                       isMine ? "justify-end" : "justify-start"
                     }`}
                   >
-                    <div
-                      className={`px-4 py-2 rounded-lg max-w-xs break-words ${
-                        isMine
-                          ? "bg-blue-500 text-white"
-                          : "bg-gray-200 text-gray-800"
-                      }`}
-                    >
-                      {msg.content}
-                      <div className="text-xs mt-1 opacity-70 text-right">
-                        {new Date(msg.created_at).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`px-4 py-2 rounded-lg max-w-xs break-words ${
+                          isMine
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-200 text-gray-800"
+                        }`}
+                      >
+                        {msg.content}
+                        <div className="text-xs mt-1 opacity-70 text-right">
+                          {new Date(msg.created_at).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
                       </div>
+
+                      {/* 🗑️ Delete button (only show for my messages) */}
+                      {isMine && (
+                        <button
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                          title="Delete message"
+                        >
+                          🗑️
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
               })}
+
               <div ref={messagesEndRef} />
             </div>
 
