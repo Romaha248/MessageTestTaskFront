@@ -181,7 +181,7 @@ export default function ChatsPage() {
             chat_id: activeChat.id,
             content: savedMessage.content,
             sender_id: savedMessage.sender_id,
-            id: savedMessage.id,
+            message_id: savedMessage.id,
             event: "message_new",
             created_at: savedMessage.created_at,
           })
