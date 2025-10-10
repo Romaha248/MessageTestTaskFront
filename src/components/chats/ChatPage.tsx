@@ -6,7 +6,6 @@ import type { Chat, Message } from "../../interfaces/chat";
 import { getAllUsers } from "../../service/auth";
 import {
   createChat,
-  createMessage,
   deleteMessage,
   getAllChats,
   getAllMessages,
@@ -65,22 +64,29 @@ export default function ChatsPage() {
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        console.log("📩 WS message:", msg);
 
         if (msg.event === "message_deleted") {
           setMessages((prev) => prev.filter((m) => m.id !== msg.message_id));
           return;
         }
 
-        if (msg.sender_id === user?.id) return;
-        // Only show messages for the active chat
-        if (
-          activeChat &&
-          msg.chat_id === activeChat.id &&
-          msg.event === "message_new"
-        ) {
-          setMessages((prev) => [...prev, msg]);
-        }
+        // Ignore messages for other chats
+        if (!activeChat || msg.chat_id !== activeChat.id) return;
+
+        // Replace temp message if it exists
+        setMessages((prev) => {
+          // If temp message exists with same content and sender, replace its ID
+          const tempIndex = prev.findIndex(
+            (m) => m.content === msg.content && m.sender_id === msg.sender_id
+          );
+          if (tempIndex !== -1) {
+            const updated = [...prev];
+            updated[tempIndex] = msg;
+            return updated;
+          }
+          // Otherwise just add
+          return [...prev, msg];
+        });
       } catch (err) {
         console.error("Error parsing WS message:", err);
       }
@@ -145,10 +151,10 @@ export default function ChatsPage() {
   };
 
   // --- Send message ---
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!newMessage.trim() || !activeChat || !user?.id) return;
 
-    const tempId = crypto.randomUUID(); // temporary ID for optimistic UI
+    const tempId = crypto.randomUUID();
     const tempMessage: Message = {
       id: tempId,
       chat_id: activeChat.id,
@@ -157,40 +163,17 @@ export default function ChatsPage() {
       created_at: new Date().toISOString(),
     };
 
-    // Optimistic update
     setMessages((prev) => [...prev, tempMessage]);
     setNewMessage("");
 
-    try {
-      // Save via REST API and get real message with DB ID
-      const savedMessage = await createMessage(
-        activeChat.id,
-        tempMessage.content,
-        user.id
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          event: "message_new",
+          chat_id: activeChat.id,
+          content: tempMessage.content,
+        })
       );
-
-      // Replace temp message with real one
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? savedMessage : m))
-      );
-
-      // Send via WebSocket using real message
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            chat_id: activeChat.id,
-            content: savedMessage.content,
-            sender_id: savedMessage.sender_id,
-            message_id: savedMessage.id,
-            event: "message_new",
-            created_at: savedMessage.created_at,
-          })
-        );
-      }
-    } catch (err) {
-      console.error("Failed to send message:", err);
-      // Optionally remove temp message on failure
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };
 
