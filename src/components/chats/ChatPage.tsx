@@ -74,7 +74,11 @@ export default function ChatsPage() {
 
         if (msg.sender_id === user?.id) return;
         // Only show messages for the active chat
-        if (activeChat && msg.chat_id === activeChat.id) {
+        if (
+          activeChat &&
+          msg.chat_id === activeChat.id &&
+          msg.event === "message_new"
+        ) {
           setMessages((prev) => [...prev, msg]);
         }
       } catch (err) {
@@ -163,6 +167,7 @@ export default function ChatsPage() {
           JSON.stringify({
             chat_id: activeChat.id,
             content: messageData.content,
+            event: "message_new",
           })
         );
       }
